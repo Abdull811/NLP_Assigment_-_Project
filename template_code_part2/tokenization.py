@@ -3,7 +3,6 @@ from util import *
 # Add your import statements here
 # (Students may import required libraries such as nltk, spacy, re, etc.)
 import re
-import spacy
 from nltk.tokenize import TreebankWordTokenizer
 
 class Tokenization():
@@ -12,8 +11,8 @@ class Tokenization():
 		
 		# Prepare the Penn Treebank tokenizer 
 		self.ptb_tokenizer = TreebankWordTokenizer()
-		# Load spacy model
-		self.nlp = spacy.load("en_core_web_sm")
+		# Load spaCy only if the spaCy tokenizer is selected.
+		self.nlp = None
 		
 	def naive(self, text):
 		"""
@@ -68,8 +67,15 @@ class Tokenization():
 			# Use the Penn Tree Bank Tokenizer to tokenize the sentence
 			# It split the sentence and handling punctuation correctly
 			# Eg Don't use it. -> ['Don',''', 't','use', 'it', '.']		
-			tokens = self.ptb_tokenizer.tokenize(sentence)
-			tokenizedText.append(tokens)	
+			raw_tokens = self.ptb_tokenizer.tokenize(sentence)
+			tokens = []
+
+			for token in raw_tokens:
+				token = token.lower()
+				if token.isalpha():
+					tokens.append(token)
+
+			tokenizedText.append(tokens)
 
 		return tokenizedText
 
@@ -93,6 +99,9 @@ class Tokenization():
 
 		# Fill in code here
 		tokenizedText = []
+		if self.nlp is None:
+			import spacy
+			self.nlp = spacy.load("en_core_web_sm")
 
 		for sentence in text:
 			# Let spacy break the sentence into tokens

@@ -3,8 +3,12 @@ from util import *
 # Add your import statements here
 import nltk
 from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
 
-nltk.download('stopwords')
+try:
+	nltk.data.find("corpora/stopwords")
+except LookupError:
+	nltk.download('stopwords')
 
 
 class StopwordRemoval():
@@ -12,6 +16,10 @@ class StopwordRemoval():
 	def __init__(self):
 		# Prepare the list of stopwords
 		self.stop_words = set(stopwords.words("english"))
+		# The pipeline stems tokens before stopword removal, so also store
+		# stemmed stopwords such as "wa" from "was" and "ha" from "has".
+		stemmer = PorterStemmer()
+		self.stemmed_stop_words = set(stemmer.stem(word) for word in self.stop_words)
 
 	def fromList(self, text):
 		"""
@@ -41,8 +49,10 @@ class StopwordRemoval():
 				# Check if the token is not stopword
 				# If it's not a stopword, add it to the filtered sentence
 				# if token.lower() not in self.stop_words:
-				if token.lower() not in self.stop_words and len(token) > 2:
+				token = token.lower()
+				if len(token) > 1 and token not in self.stop_words and token not in self.stemmed_stop_words:
 					filtered_sentence.append(token)
+
 			# Save the cleaned sentence
 			stopwordRemovedText.append(filtered_sentence)		
 

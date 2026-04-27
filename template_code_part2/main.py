@@ -8,6 +8,7 @@ from evaluation import Evaluation
 from sys import version_info
 import argparse
 import json
+import time
 import matplotlib.pyplot as plt
 import os
 
@@ -126,16 +127,26 @@ class SearchEngine:
         query_ids = [item["query number"] for item in queries_json]
         queries = [item["query"] for item in queries_json]
 
+
         processedQueries = self.preprocessQueries(queries)
 
         docs_json = json.load(open(os.path.join(args.dataset, "cran_docs.json"), 'r'))[:]
         doc_ids = [item["id"] for item in docs_json]
-        docs = [item["body"] for item in docs_json]
+        # Cranfield titles are short and highly descriptive, so repeat the title
+        # to give title terms a small TF-IDF boost during ranking.
+        docs = [
+            item["title"] + " " + item["title"] + " " + item["body"]
+            for item in docs_json
+        ]
 
         processedDocs = self.preprocessDocs(docs)
-
+        
+        start_time = time.time()
         self.informationRetriever.buildIndex(processedDocs, doc_ids)
         doc_IDs_ordered = self.informationRetriever.rank(processedQueries)
+        end_time = time.time()
+
+        print("Runtime of IR system:", end_time - start_time, "seconds")
 
         qrels = json.load(open(os.path.join(args.dataset, "cran_qrels.json"), 'r'))[:]
 
@@ -151,7 +162,7 @@ class SearchEngine:
             recalls.append(recall)
             fscores.append(fscore)
 
-            print(f"Precision, Recall, F-score @ {k}: {precision}, {recall}, {fscore}")
+            print(f"Precision, Recall, F0.5-score @ {k}: {precision}, {recall}, {fscore}")
 
             MAP = self.evaluator.meanAveragePrecision(doc_IDs_ordered, query_ids, qrels, k)
             nDCG = self.evaluator.meanNDCG(doc_IDs_ordered, query_ids, qrels, k)
@@ -166,7 +177,7 @@ class SearchEngine:
         # Plot
         plt.plot(range(1, 11), precisions, label="Precision")
         plt.plot(range(1, 11), recalls, label="Recall")
-        plt.plot(range(1, 11), fscores, label="F-Score")
+        plt.plot(range(1, 11), fscores, label="F0.5-Score")
         plt.plot(range(1, 11), MAPs, label="MAP")
         plt.plot(range(1, 11), nDCGs, label="nDCG")
         plt.plot(range(1, 11), MRRs, label="MRR")
@@ -185,7 +196,11 @@ class SearchEngine:
 
         docs_json = json.load(open(os.path.join(args.dataset, "cran_docs.json"), 'r'))[:]
         doc_ids = [item["id"] for item in docs_json]
-        docs = [item["body"] for item in docs_json]
+        # Use the same title boost for custom queries as for evaluation.
+        docs = [
+            item["title"] + " " + item["title"] + " " + item["body"]
+            for item in docs_json
+        ]
 
         processedDocs = self.preprocessDocs(docs)
 
@@ -204,7 +219,7 @@ if __name__ == "__main__":
     parser.add_argument('-dataset', default="cranfield/")
     parser.add_argument('-out_folder', default="output/")
     parser.add_argument('-segmenter', default="punkt")
-    parser.add_argument('-tokenizer', default="ptb")
+    parser.add_argument('-tokenizer', default="naive")
     parser.add_argument('-custom', action="store_true")
 
     args = parser.parse_args()

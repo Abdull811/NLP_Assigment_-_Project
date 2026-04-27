@@ -126,19 +126,15 @@ class Evaluation():
 		for rank, doc_id in enumerate(query_doc_IDs_ordered[:k], start=1):
 			relevance = relevance_lookup.get(doc_id, 0)
 			gain = float(relevance)
-			if rank == 1:
-				dcg += gain
-			else:
-				dcg += gain / math.log(rank, 2)
+			# Standard nDCG discounts rank i by log2(i + 1).
+			dcg += gain / math.log(rank + 1, 2)
 
 		ideal_relevances = sorted(relevance_lookup.values(), reverse=True)[:k]
 		idcg = 0.0
 		for rank, relevance in enumerate(ideal_relevances, start=1):
 			gain = float(relevance)
-			if rank == 1:
-				idcg += gain
-			else:
-				idcg += gain / math.log(rank, 2)
+			# Use the same discount for the ideal ranking.
+			idcg += gain / math.log(rank + 1, 2)
 
 		if idcg == 0.0:
 			return 0.0

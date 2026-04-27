@@ -3,17 +3,22 @@ from util import *
 # Add your import statements here
 import re
 import nltk
-import spacy
 from nltk.tokenize import sent_tokenize
 
-nltk.download('punkt')
-nltk.download("punkt_tab")
+for resource_path, package_name in [
+	("tokenizers/punkt", "punkt"),
+	("tokenizers/punkt_tab", "punkt_tab"),
+]:
+	try:
+		nltk.data.find(resource_path)
+	except LookupError:
+		nltk.download(package_name)
 
 class SentenceSegmentation():
 
 	def __init__(self):
-		# Load spaCy model (students may use this if needed)
-		self.nlp = spacy.load("en_core_web_sm")
+		# Load spaCy only if the spaCy segmenter is selected.
+		self.nlp = None
 
 	def naive(self, text):
 		"""
@@ -104,6 +109,9 @@ class SentenceSegmentation():
 			return []
 		
 		# Process the text using spacy 
+		if self.nlp is None:
+			import spacy
+			self.nlp = spacy.load("en_core_web_sm")
 		doc = self.nlp(text)
 
 		segmentedText = []

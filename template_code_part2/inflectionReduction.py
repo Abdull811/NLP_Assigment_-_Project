@@ -2,19 +2,16 @@ from util import *
 
 # Add your import statements here
 # (Students may import required libraries such as nltk, WordNetLemmatizer, PorterStemmer, etc.)
-import nltk
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 
-# Download wordnet data for lemmatization
-nltk.download('wordnet') 
-nltk.download("omw-1.4") # Download open multilingual wordnet data for lemmatization
 
 class InflectionReduction:
 	def __init__(self):
 		# Prepare the Porter stemmer and WordNet lemmatizer
 		self.porter = PorterStemmer()
 		self.lemmatizer = WordNetLemmatizer()
-		 
+
+	
 	def porterStemmer(self, text):
 		"""
 		Inflection Reduction using Porter Stemmer
@@ -49,7 +46,7 @@ class InflectionReduction:
 
 		return reducedText
 
-
+    
 	def wordnetLemmatizer(self, text):
 		"""
 		Inflection Reduction using WordNet Lemmatizer
@@ -74,10 +71,12 @@ class InflectionReduction:
 		reducedText = []
 		for sentence in text:
 			reducedSentence = []
+
 			for token in sentence:
 				# Convert each token to its base dictionary form.
-				lemsentence = self.lemmatizer.lemmatize(token)
-				reducedSentence.append(lemsentence)
+				lemma = self.lemmatizer.lemmatize(token)
+				reducedSentence.append(lemma)  # Save the lemmatized sentence
+
 			reducedText.append(reducedSentence)
 
 		return reducedText
@@ -93,8 +92,9 @@ class InflectionReduction:
 		reducedText = None
 
 		# Fill in code here
-		# Use Porter stemming as the default method.
-		# reducedText = self.porterStemmer(text)  # For Porter sstemmer
-		reducedText = self.wordnetLemmatizer(text) # For WordNet Lemmatizer
+		# Porter stemming works better for Cranfield because it matches related
+		# technical word forms such as "compressible" and "compressibility".
+		reducedText = self.porterStemmer(text)
+		# reducedText = self.wordnetLemmatizer(text) # For WordNet Lemmatizer
 
 		return reducedText
