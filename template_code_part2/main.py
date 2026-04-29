@@ -141,14 +141,17 @@ class SearchEngine:
 
         processedDocs = self.preprocessDocs(docs)
         
+        self.informationRetriever.setFeedback(self.args.model == "improved")
+
         start_time = time.time()
         self.informationRetriever.buildIndex(processedDocs, doc_ids)
         doc_IDs_ordered = self.informationRetriever.rank(processedQueries)
         end_time = time.time()
 
-        print("Runtime of IR system:", end_time - start_time, "seconds")
-
         qrels = json.load(open(os.path.join(args.dataset, "cran_qrels.json"), 'r'))[:]
+
+        print("Model:", self.args.model)
+        print("Runtime of IR system:", end_time - start_time, "seconds")
 
         precisions, recalls, fscores, MAPs, nDCGs, MRRs = [], [], [], [], [], []
 
@@ -187,6 +190,40 @@ class SearchEngine:
         plt.xlabel("k")
         plt.savefig(os.path.join(args.out_folder, "eval_plot.png"))
 
+    def compareModels(self):
+        queries_json = json.load(open(os.path.join(args.dataset, "cran_queries.json"), 'r'))[:]
+        query_ids = [item["query number"] for item in queries_json]
+        queries = [item["query"] for item in queries_json]
+        processedQueries = self.preprocessQueries(queries)
+
+        docs_json = json.load(open(os.path.join(args.dataset, "cran_docs.json"), 'r'))[:]
+        doc_ids = [item["id"] for item in docs_json]
+        docs = [
+            item["title"] + " " + item["title"] + " " + item["body"]
+            for item in docs_json
+        ]
+        processedDocs = self.preprocessDocs(docs)
+        qrels = json.load(open(os.path.join(args.dataset, "cran_qrels.json"), 'r'))[:]
+
+        print("Model, Runtime, Precision@10, Recall@10, F0.5@10, MAP@10, nDCG@10, MRR@10")
+        for model_name, feedback_enabled in [("baseline_tfidf", False), ("improved_prf", True)]:
+            self.informationRetriever = InformationRetrieval()
+            self.informationRetriever.setFeedback(feedback_enabled)
+
+            start_time = time.time()
+            self.informationRetriever.buildIndex(processedDocs, doc_ids)
+            doc_IDs_ordered = self.informationRetriever.rank(processedQueries)
+            runtime = time.time() - start_time
+
+            precision = self.evaluator.meanPrecision(doc_IDs_ordered, query_ids, qrels, 10)
+            recall = self.evaluator.meanRecall(doc_IDs_ordered, query_ids, qrels, 10)
+            fscore = self.evaluator.meanFscore(doc_IDs_ordered, query_ids, qrels, 10)
+            MAP = self.evaluator.meanAveragePrecision(doc_IDs_ordered, query_ids, qrels, 10)
+            nDCG = self.evaluator.meanNDCG(doc_IDs_ordered, query_ids, qrels, 10)
+            MRR = self.evaluator.meanReciprocalRank(doc_IDs_ordered, query_ids, qrels, 10)
+
+            print(f"{model_name}, {runtime}, {precision}, {recall}, {fscore}, {MAP}, {nDCG}, {MRR}")
+
     def handleCustomQuery(self):
 
         print("Enter query below")
@@ -220,13 +257,17 @@ if __name__ == "__main__":
     parser.add_argument('-out_folder', default="output/")
     parser.add_argument('-segmenter', default="punkt")
     parser.add_argument('-tokenizer', default="naive")
+    parser.add_argument('-model', default="improved", choices=["baseline", "improved"])
+    parser.add_argument('-compare', action="store_true")
     parser.add_argument('-custom', action="store_true")
 
     args = parser.parse_args()
 
     searchEngine = SearchEngine(args)
 
-    if args.custom:
+    if args.compare:
+        searchEngine.compareModels()
+    elif args.custom:
         searchEngine.handleCustomQuery()
     else:
         searchEngine.evaluateDataset()

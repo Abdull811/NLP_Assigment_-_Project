@@ -2,7 +2,7 @@ from util import *
 
 # Add your import statements here
 import math
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 class InformationRetrieval():
@@ -13,6 +13,7 @@ class InformationRetrieval():
 		self.doc_ids = []
 		self.doc_vectors = {}
 		self.doc_norms = {}
+		self.term_doc_weights = {}
 		self.idf = {}
 		self.vocabulary = set()
 		self.doc_term_counts = {}
@@ -21,6 +22,7 @@ class InformationRetrieval():
 		self.feedback_docs = 2
 		self.query_alpha = 1.4
 		self.feedback_beta = 0.4
+		self.use_feedback = True
 
 	def _flatten(self, text):
 		terms = []
@@ -82,13 +84,16 @@ class InformationRetrieval():
 
 		self.doc_vectors = {}
 		self.doc_norms = {}
+		self.term_doc_weights = defaultdict(dict)
 
 		for doc_id, term_counts in self.doc_term_counts.items():
 			vector = {}
 
 			for term, count in term_counts.items():
 				tf = 1.0 + math.log(count)
-				vector[term] = tf * self.idf[term]
+				weight = tf * self.idf[term]
+				vector[term] = weight
+				self.term_doc_weights[term][doc_id] = weight
 
 			norm = math.sqrt(sum(weight * weight for weight in vector.values()))
 			self.doc_vectors[doc_id] = vector
@@ -99,7 +104,8 @@ class InformationRetrieval():
 			"document_frequency": dict(document_frequency),
 			"idf": self.idf,
 			"doc_vectors": self.doc_vectors,
-			"doc_norms": self.doc_norms
+			"doc_norms": self.doc_norms,
+			"term_doc_weights": dict(self.term_doc_weights)
 		}
 
 
@@ -126,21 +132,23 @@ class InformationRetrieval():
 			if query_norm == 0:
 				query_norm = 1e-6
 
+			dot_products = defaultdict(float)
+
+			# Use the inverted TF-IDF index so only documents sharing query
+			# terms are scored. Documents with zero score are appended later.
+			for term, q_weight in query_vector.items():
+				for doc_id, doc_weight in self.term_doc_weights.get(term, {}).items():
+					dot_products[doc_id] += q_weight * doc_weight
+
 			scores = []
-
-			for doc_id in self.doc_ids:
-				doc_vector = self.doc_vectors[doc_id]
-				dot_product = 0.0
-
-				for term, q_weight in query_vector.items():
-					if term in doc_vector:
-						dot_product += q_weight * doc_vector[term]
-
+			scored_doc_ids = set(dot_products.keys())
+			for doc_id, dot_product in dot_products.items():
 				score = dot_product / (query_norm * self.doc_norms[doc_id])
 				scores.append((doc_id, score))
 
 			scores.sort(key=lambda x: (-x[1], x[0]))
-			return scores
+			zero_score_docs = [(doc_id, 0.0) for doc_id in self.doc_ids if doc_id not in scored_doc_ids]
+			return scores + zero_score_docs
 
 		doc_IDs_ordered = []
 
@@ -159,6 +167,10 @@ class InformationRetrieval():
 				query_vector[term] = tf * self.idf[term]
 
 			scores = score_documents(query_vector)
+
+			if not self.use_feedback:
+				doc_IDs_ordered.append([doc_id for doc_id, _ in scores])
+				continue
 
 			# Rocchio-style pseudo-relevance feedback:
 			# expand the original query using the average TF-IDF vector of the
@@ -181,3 +193,13 @@ class InformationRetrieval():
 			doc_IDs_ordered.append([doc_id for doc_id, _ in scores])
 
 		return doc_IDs_ordered
+
+
+	def setFeedback(self, enabled):
+		"""
+		Enable or disable pseudo-relevance feedback.
+		This lets main.py compare the basic TF-IDF VSM against the improved
+		system without changing code between runs.
+		"""
+
+		self.use_feedback = enabled
