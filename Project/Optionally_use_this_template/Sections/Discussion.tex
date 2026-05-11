@@ -1,1 +1,40 @@
 \section{Discussion}\label{sec:discuss}
+
+The results support the hypothesis that pseudo-relevance feedback improves
+top-10 retrieval effectiveness on Cranfield. MAP@10 increased from 0.3247 to
+0.3639, and the paired AP@10 comparison showed substantially more wins than
+losses. This suggests that the top retrieved document often contains useful
+technical vocabulary that is missing from the original query. In such cases,
+feedback expansion helps bridge vocabulary mismatch without requiring external
+resources.
+
+The improvement is not uniform. MRR@10 decreased slightly from 0.7759 to 0.7623.
+This indicates that feedback can sometimes move the first relevant document
+down, especially when the top initial document is only partially relevant or
+introduces terms from a narrower subtopic. One failure case was query 77, which
+asks about comparing shock-layer theory with experiments in the low Reynolds
+number regime. Its AP@10 decreased after feedback, suggesting query drift from
+the initially retrieved document. In contrast, queries such as query 20 on Joule
+heating in magnetohydrodynamic free convection, query 64 on predicting flutter,
+query 78 on the surge line of an axial compressor, and query 91 on transonic
+interference effects improved strongly because the feedback document added
+technical terms that matched other relevant Cranfield documents.
+
+The baseline VSM limitations remain important. First, VSM depends on lexical
+overlap, so it struggles when a query and relevant document use different
+technical expressions. Second, it does not understand word sense; the toy
+example with \emph{star} shows that the same term can refer to astronomy or
+Hollywood. Third, out-of-vocabulary terms receive no vector weight. If a query
+contains only terms absent from the document vocabulary, the implemented system
+cannot compute a meaningful similarity score and returns the default ordering.
+For example, a query containing a misspelled or unseen term such as
+``hypersonicx flutterzz'' would have no useful overlap unless spelling
+correction or character-level matching were added.
+
+The current approach is therefore best understood as a strong lexical baseline
+with a controlled feedback mechanism. It is interpretable, efficient, and
+measurably better than the no-feedback baseline for MAP@10, but it is not a full
+semantic search system. Methods such as LSA, query spelling correction, or
+neural sentence embeddings could address some remaining failures, but they
+would require additional validation to avoid replacing one kind of query drift
+with another.
