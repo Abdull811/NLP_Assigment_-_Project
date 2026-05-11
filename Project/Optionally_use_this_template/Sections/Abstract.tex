@@ -1,6 +1,7 @@
 This project implements and evaluates an Information Retrieval system on the 
 Cranfield dataset using the TF-IDF Vector Space Model. The baseline system ranks documents using cosine similarity.
 We evaluate Precision@k, Recall@k, F0.5@k, MAP@k, nDCG@k, MRR, and runtime for k=1 to 10. 
-To improve retrieval, we introduce Porter stemming, title-weighted document representation, stemmed stopword removal, 
-one-character token filtering, pseudo-relevance feedback, and an inverted TF-IDF index for efficiency. 
-The improved system outperforms the baseline TF-IDF system on Precision@10, Recall@10, F0.5@10, MAP@10, and nDCG@10.
+To improve retrieval, we introduce Porter stemming, stemmed stopword removal, one-character token filtering, 
+pseudo-relevance feedback, smoothed TF-IDF weighting, and an inverted TF-IDF index for efficiency. 
+On the Cranfield evaluation, pseudo-relevance feedback improves Precision@10 from 0.2862 to 0.3182, 
+Recall@10 from 0.4207 to 0.4543, MAP@10 from 0.3247 to 0.3639, and nDCG@10 from 0.4830 to 0.5091.
