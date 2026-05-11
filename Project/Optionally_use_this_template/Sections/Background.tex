@@ -1,5 +1,3 @@
-\section{Background}\label{sec:background}
-
 This section presents the basic Information Retrieval (IR) concepts used in the
 project. Before applying the system to the Cranfield collection, we illustrate
 the main steps using the toy corpus from the assignment. The toy corpus contains
@@ -181,3 +179,31 @@ The cosine similarity between the query vector $\vec{q}$ and a document vector $
 \end{equation}
 
 The cosine similarity between the query "star light" and $d_1$
+
+\subsection{Boolean Retrieval and Cosine Ranking}
+
+For the query ``star light'', Boolean OR retrieval returns $d_1$, $d_2$, and
+$d_3$ because all contain \emph{star}; Boolean AND retrieval returns only $d_1$
+because it is the only document containing both query terms. In TF-IDF cosine
+ranking, the query vector has zero weight for \emph{star} and weight 0.4771 for
+\emph{light}. Therefore only $d_1$ has a non-zero dot product with the query.
+The ranking is:
+
+\begin{equation}
+d_1 > d_2 = d_3.
+\end{equation}
+
+This ranking is desirable for ``star light'' because the query is about the
+solar-system sense of \emph{star}, and $d_1$ discusses heat and light from the
+sun. However, the example also shows a limitation: the word \emph{star} itself
+does not help disambiguate the meaning because it occurs in every document.
+
+\subsection{Word Sense Ambiguity}
+
+For the query ``movie star'', the ideal result is $d_2$, since it discusses a
+Hollywood actor and a movie premiere. A lexical TF-IDF system can retrieve $d_2$
+because \emph{movi} appears only in that document. If the query were only
+``star'', however, all three documents would look equally weak after IDF
+weighting because the term has IDF zero in the toy collection. This illustrates
+word sense ambiguity: VSM treats the same surface form as one term even when it
+refers to different concepts.
