@@ -1,1 +1,23 @@
-\section{Conclusion}\label{sec:conclusion}
+\section{Conclusion and Future Work}\label{sec:conclusion}
+
+This project implemented a TF-IDF Vector Space retrieval system for the
+Cranfield dataset and evaluated it using standard ranked retrieval metrics. The
+final system uses Punkt sentence segmentation, Penn Treebank tokenization,
+Porter stemming, stemmed stopword removal, smoothed TF-IDF, cosine similarity,
+an inverted TF-IDF index, and Rocchio-style pseudo-relevance feedback.
+
+The improved system outperformed the no-feedback baseline at $k=10$ for
+Precision, Recall, F0.5, MAP, and nDCG. The strongest summary result is the
+increase in MAP@10 from 0.3247 to 0.3639, supported by a paired sign test over
+per-query AP@10 values. Therefore, for the Cranfield ranked retrieval task, the
+implemented feedback-enhanced TF-IDF system is better than the basic TF-IDF
+cosine baseline with respect to MAP@10, under the assumption that the initial
+top-ranked document is usually useful for expansion.
+
+Future work should address the remaining weaknesses. First, spelling correction
+or character n-gram matching could reduce zero-result failures caused by
+out-of-vocabulary and misspelled query terms. Second, feedback parameters
+$(m,\alpha,\beta)$ should be tuned on a validation split instead of fixed
+manually. Third, semantic methods such as LSA could be compared against the
+current feedback model to test whether latent concepts improve retrieval without
+causing excessive query drift.
