@@ -1,69 +1,143 @@
 \section{Approach}\label{sec:approach}
 
-The system follows the standard IR pipeline: preprocessing, indexing, query
-processing, ranking, and evaluation. The implementation is built on the provided
-Python template. Sentence segmentation uses NLTK Punkt, tokenization uses the
+The system follows the standard Information Retrieval (IR) pipeline:
+preprocessing, indexing, query processing, ranking, and evaluation. The
+implementation is built on the provided Python template.
+
+Sentence segmentation uses the NLTK Punkt tokenizer, tokenization uses the
 Penn Treebank tokenizer, inflection reduction uses Porter stemming, and
 stopword removal uses the NLTK English stopword list. Because stemming is
 performed before stopword removal, the implementation also removes stemmed
-stopwords such as \emph{wa} and \emph{ha}. Tokens of length one and non-alphabetic
-tokens are filtered to reduce noisy matches.
+stopwords such as \emph{wa} and \emph{ha}. Tokens of length one and
+non-alphabetic tokens are filtered to reduce noisy matches and improve
+retrieval quality.
 
 \subsection{Baseline TF-IDF Retrieval}
 
-The baseline represents each document as a TF-IDF vector and ranks documents by
-cosine similarity with the query. For a term $t$ in document $d$, the system uses
-log-scaled term frequency:
+The baseline retrieval system represents each document as a TF-IDF vector and
+ranks documents using cosine similarity with the query vector.
+
+For a term $t$ in document $d$, the system uses log-scaled term frequency:
 
 \begin{equation}
-TF(t,d)=1+\log(f_{t,d}),
+TF(t,d)=
+\begin{cases}
+1+\log(f_{t,d}), & f_{t,d}>0 \\
+0, & f_{t,d}=0
+\end{cases}
+\label{eq:tf}
 \end{equation}
 
-where $f_{t,d}$ is the raw count of $t$ in $d$. The implementation uses smoothed
-IDF:
+where $f_{t,d}$ is the raw frequency of term $t$ in document $d$.
+
+The implementation uses smoothed inverse document frequency:
 
 \begin{equation}
-IDF(t)=\log\left(\frac{N+1}{df_t+1}\right)+1.
+IDF(t)=
+\log\left(
+\frac{N+1}{df_t+1}
+\right)+1,
+\label{eq:idf}
 \end{equation}
 
-The document weight is $TF(t,d)\times IDF(t)$. Query vectors use the same
-weighting scheme, restricted to terms present in the document vocabulary. If a
-query has no in-vocabulary terms, the system cannot compute a meaningful lexical
-match and returns the default document order.
+where $N$ is the total number of documents in the collection and $df_t$ is
+the number of documents containing term $t$.
+
+The final TF-IDF document weight is computed as:
+
+\begin{equation}
+w(t,d)=TF(t,d)\times IDF(t).
+\label{eq:tfidf}
+\end{equation}
+
+Query vectors use the same weighting scheme, restricted to terms appearing in
+the document vocabulary. If a query contains no in-vocabulary terms, the
+system cannot compute a meaningful lexical similarity score and therefore
+returns the default document ordering.
 
 \subsection{Efficient Inverted TF-IDF Index}
 
-Instead of comparing each query with every full document vector, the system
-stores an inverted TF-IDF index from term to document weights. During ranking,
-only documents sharing at least one query term receive a non-zero dot product.
-The remaining documents are appended with score zero. This keeps the ranking
-equivalent to cosine scoring for matching documents while avoiding unnecessary
-work for documents that cannot match the query.
+Instead of comparing each query against every full document vector, the system
+stores an inverted TF-IDF index mapping each term to the documents containing
+that term together with their TF-IDF weights.
+
+During retrieval, cosine similarity is computed only for documents sharing at
+least one query term. Documents without overlapping query terms receive zero
+cosine similarity and therefore appear at the bottom of the ranking.
+
+This sparse retrieval strategy reduces computational cost by avoiding
+unnecessary cosine similarity computations for documents that cannot match the
+query while preserving the same ranking behaviour for matching documents.
 
 \subsection{Pseudo-Relevance Feedback}
 
-The main retrieval improvement is Rocchio-style pseudo-relevance feedback. The
-system first ranks documents using the original query. It then assumes that the
-top retrieved document is relevant and expands the query vector using that
-document's TF-IDF vector:
+The main retrieval improvement uses Rocchio-style pseudo-relevance feedback
+(PRF). The system first retrieves an initial ranked list using the original
+query vector. It then assumes that the top retrieved document is relevant and
+expands the query vector using the TF-IDF representation of the feedback
+document.
+
+The updated query vector is computed as:
+
 
 \begin{equation}
-\vec{q'}=\alpha\vec{q}+\frac{\beta}{m}\sum_{d \in D_m}\vec{d},
+\vec{q}^{\,\prime}
+=
+\alpha \vec{q}
++
+\frac{\beta}{|D_r|}
+\sum_{d \in D_r} \vec{d}
+-
+\frac{\gamma}{|D_{nr}|}
+\sum_{d \in D_{nr}} \vec{d},
+\label{eq:rocchio}
 \end{equation}
 
-where $D_m$ is the set of top-$m$ feedback documents. In the implementation,
-$m=1$, $\alpha=1.0$, and $\beta=0.2$. This setting keeps the original query
-dominant while allowing related technical terms from the highest ranked document
-to improve recall. The method is well suited to Cranfield because many relevant
-documents describe the same aerodynamics concept using related but not identical
-technical vocabulary.
+where:
+
+\begin{itemize}
+    \item $\vec{q}$ is the original query vector,
+    \item $\vec{q}^{\,\prime}$ is the updated query vector,
+    \item $D_r$ is the set of relevant feedback documents,
+    \item $D_{nr}$ is the set of non-relevant feedback documents,
+    \item $\alpha$ controls the contribution of the original query,
+    \item $\beta$ controls the contribution of relevant documents,
+    \item $\gamma$ controls the contribution of non-relevant documents.
+\end{itemize}
+
+In the implemented pseudo-relevance feedback setting, the system assumes that
+the top retrieved document is relevant and does not explicitly model
+non-relevant documents. Therefore:
+
+\[
+|D_r|=1,\qquad
+|D_{nr}|=0,\qquad
+\alpha=1.0,\qquad
+\beta=0.75,\qquad
+\gamma=0.15
+\]
+
+This configuration keeps the original query dominant while allowing related
+technical terms from the highest-ranked document to improve recall. The method
+is particularly suitable for the Cranfield collection because many relevant
+aerodynamics documents describe similar concepts using related but not
+identical technical vocabulary.
 
 \subsection{Limitations Addressed}
 
-The improvements target three observed VSM limitations. First, stemming reduces
-mismatches between related word forms, such as singular and plural forms or
-technical suffix variants. Second, stemmed stopword removal prevents common
-function words from surviving after stemming. Third, feedback expansion reduces
-the vocabulary mismatch problem by adding terms from an initially retrieved
-document. These changes do not solve true semantic ambiguity, but they improve
-top-ranked retrieval while keeping the system interpretable.
+The implemented improvements target several common limitations of the Vector
+Space Model (VSM).
+
+First, stemming reduces mismatches between related word forms, including
+singular and plural forms as well as technical suffix variations.
+
+Second, stemmed stopword removal prevents common function words from remaining
+in the collection after stemming.
+
+Third, pseudo-relevance feedback reduces the vocabulary mismatch problem by
+adding related terms from an initially retrieved document to the query vector.
+
+These improvements do not fully solve semantic ambiguity, since the system
+still relies on lexical matching rather than semantic understanding.
+However, they improve top-ranked retrieval performance while maintaining the
+interpretability and simplicity of the classical TF-IDF Vector Space Model.
