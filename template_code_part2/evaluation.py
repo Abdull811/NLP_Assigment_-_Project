@@ -11,7 +11,10 @@ class Evaluation():
 		for item in qrels:
 			query_id = int(item.get("query number", item.get("query_num")))
 			doc_id = int(item["id"])
-			relevance = int(item.get("position", item.get("relevance", 0)))
+			position = int(item.get("position", item.get("relevance", 0)))
+			# Convert Cranfield position 1-4 into graded relevance 4-1.
+			relevance = 5 - position if 1 <= position <= 4 else 0
+						
 			if query_id not in relevance_lookup:
 				relevance_lookup[query_id] = {}
 			relevance_lookup[query_id][doc_id] = relevance
@@ -23,6 +26,7 @@ class Evaluation():
 			item_query_id = int(item.get("query number", item.get("query_num")))
 			if item_query_id != int(query_id):
 				continue
+			# In this assignment, positions 1 to 4 are treated as relevant.
 			if 1 <= int(item.get("position", item.get("relevance", 0))) <= 4:
 				relevant_doc_ids.append(int(item["id"]))
 		return relevant_doc_ids
@@ -37,6 +41,7 @@ class Evaluation():
 			return 0.0
 		relevant = set(true_doc_IDs)
 		retrieved = query_doc_IDs_ordered[:k]
+		# Count how many retrieved documents are truly relevant.
 		relevant_retrieved = sum(1 for doc_id in retrieved if doc_id in relevant)
 		precision = relevant_retrieved / float(k)
 
@@ -66,6 +71,7 @@ class Evaluation():
 		if not relevant:
 			return 0.0
 		retrieved = query_doc_IDs_ordered[:k]
+		# Recall divides relevant retrieved documents by all relevant documents.
 		relevant_retrieved = sum(1 for doc_id in retrieved if doc_id in relevant)
 		recall = relevant_retrieved / float(len(relevant))
 
@@ -93,6 +99,7 @@ class Evaluation():
 		"""
 		precision = self.queryPrecision(query_doc_IDs_ordered, query_id, true_doc_IDs, k)
 		recall = self.queryRecall(query_doc_IDs_ordered, query_id, true_doc_IDs, k)
+		# beta = 0.5 gives more weight to precision than recall.
 		beta = 0.5
 		beta_sq = beta * beta
 		if precision == 0.0 and recall == 0.0:
@@ -171,6 +178,7 @@ class Evaluation():
 		hits = 0
 		for rank, doc_id in enumerate(query_doc_IDs_ordered[:k], start=1):
 			if doc_id in relevant:
+				# Add precision at each rank where a relevant document is found.
 				hits += 1
 				precision_sum += hits / float(rank)
 		avgPrecision = precision_sum / float(len(relevant))
@@ -201,6 +209,7 @@ class Evaluation():
 		relevant = set(true_doc_IDs)
 		for rank, doc_id in enumerate(query_doc_IDs_ordered[:k], start=1):
 			if doc_id in relevant:
+				# Return the inverse rank of the first relevant document.
 				return 1.0 / float(rank)
 
 		reciprocalRank = 0.0
