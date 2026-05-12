@@ -20,11 +20,18 @@ class InformationRetrieval():
 		# Pseudo-relevance feedback settings. The system assumes the first
 		# few retrieved documents are useful, then expands the query vector.
 		self.feedback_docs = 1
-		self.non_feedback_docs = 1
+		self.non_feedback_docs = 0
 		self.query_alpha = 1.0
-		self.feedback_beta = 0.75
-		self.feedback_gamma = 0.15
-		self.use_feedback =  True # False
+		self.feedback_beta = 0.2
+		self.feedback_gamma = 0.0
+		self.use_feedback = True
+		self.max_expansion_terms = 20
+
+		self.use_bm25 = False
+		self.bm25_k1 = 1.2
+		self.bm25_b = 0.75
+		self.doc_lengths = {}
+		self.avg_doc_length = 0.0
 
 
 	def _flatten(self, text):
@@ -75,11 +82,13 @@ class InformationRetrieval():
 			# terms = self._get_terms(doc)
 			term_counts = Counter(terms)
 			self.doc_term_counts[doc_id] = term_counts
+			self.doc_lengths[doc_id] = sum(term_counts.values())
 
 			for term in term_counts.keys():
 				document_frequency[term] += 1
 
 		num_docs = float(len(docIDs))
+		self.avg_doc_length = sum(self.doc_lengths.values()) / float(len(self.doc_lengths))
 		self.vocabulary = set(document_frequency.keys())
 
 		# Smoothed IDF
@@ -97,8 +106,18 @@ class InformationRetrieval():
 			vector = {}
 
 			for term, count in term_counts.items():
-				tf = 1.0 + math.log(count)
-				weight = tf * self.idf[term]
+				if self.use_bm25:
+					df = document_frequency[term]
+					idf = math.log((num_docs - df + 0.5) / (df + 0.5) + 1.0)
+					dl = self.doc_lengths[doc_id]
+					denom = count + self.bm25_k1 * (
+						1.0 - self.bm25_b + self.bm25_b * dl / self.avg_doc_length
+					)
+					weight = idf * ((count * (self.bm25_k1 + 1.0)) / denom)
+				else:
+					tf = 1.0 + math.log(count)
+					weight = tf * self.idf[term]
+
 				vector[term] = weight
 				self.term_doc_weights[term][doc_id] = weight
 
@@ -176,8 +195,11 @@ class InformationRetrieval():
 			# Build the TF-IDF vector for the query.
 			query_vector = {}
 			for term, count in query_term_counts.items():
-				tf = 1.0 + math.log(count)
-				query_vector[term] = tf * self.idf[term]
+				if self.use_bm25:
+					query_vector[term] = 1.0
+				else:
+					tf = 1.0 + math.log(count)
+					query_vector[term] = tf * self.idf[term]
 
 			scores = score_documents(query_vector)
 
@@ -187,31 +209,31 @@ class InformationRetrieval():
 
 			# Rocchio-style pseudo-relevance feedback:
 			# expand the original query using the average TF-IDF vector of the
-			# top-ranked documents and reduce terms from bottom-ranked documents,
-			# then rank again.
-			# Keep the original query slightly stronger than the feedback terms.
+			# top-ranked documents, then rank again.
 			expanded_query_vector = {
 				term: self.query_alpha * weight
 				for term, weight in query_vector.items()
 			}
+
 			feedback_doc_ids = [doc_id for doc_id, _ in scores[:self.feedback_docs]]
-			non_feedback_doc_ids = [doc_id for doc_id, _ in scores[-self.non_feedback_docs:]]
+
+			feedback_terms = defaultdict(float)
 
 			for doc_id in feedback_doc_ids:
 				for term, weight in self.doc_vectors[doc_id].items():
-					expanded_query_vector[term] = (
-						expanded_query_vector.get(term, 0.0)
-						+ (self.feedback_beta * weight / float(self.feedback_docs))
-					)
+					feedback_terms[term] += weight / float(self.feedback_docs)
 
-			for doc_id in non_feedback_doc_ids:
-				for term, weight in self.doc_vectors[doc_id].items():
-					expanded_query_vector[term] = (
-						expanded_query_vector.get(term, 0.0)
-						- (self.feedback_gamma * weight / float(self.non_feedback_docs))
-					)
+			top_feedback_terms = sorted(
+				feedback_terms.items(),
+				key=lambda x: -x[1]
+			)[:self.max_expansion_terms]
 
-			# Remove negative weights because cosine scoring expects positive term weights.
+			for term, weight in top_feedback_terms:
+				expanded_query_vector[term] = (
+					expanded_query_vector.get(term, 0.0)
+					+ self.feedback_beta * weight
+				)
+
 			expanded_query_vector = {
 				term: weight
 				for term, weight in expanded_query_vector.items()
