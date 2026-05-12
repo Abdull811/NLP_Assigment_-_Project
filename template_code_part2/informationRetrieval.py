@@ -21,11 +21,11 @@ class InformationRetrieval():
 		# few retrieved documents are useful, then expands the query vector.
 		self.feedback_docs = 1
 		self.non_feedback_docs = 0
-		self.query_alpha = 1.0
-		self.feedback_beta = 0.2
+		self.query_alpha = 1.2
+		self.feedback_beta = 0.4
 		self.feedback_gamma = 0.0
 		self.use_feedback = True
-		self.max_expansion_terms = 20
+		self.max_expansion_terms = 40
 
 		self.use_bm25 = False
 		self.bm25_k1 = 1.2
